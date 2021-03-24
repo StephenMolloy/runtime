@@ -36,6 +36,7 @@ namespace System.Runtime.Caching
         private PerfCounters _perfCounters;
         private readonly bool _configLess;
         private bool _useMemoryCacheManager = true;
+        private bool _throwOnDisposed;// = false;
         private EventHandler _onAppDomainUnload;
         private UnhandledExceptionEventHandler _onUnhandledException;
 
@@ -383,6 +384,7 @@ namespace System.Runtime.Caching
             if (config != null)
             {
                 _useMemoryCacheManager = ConfigUtil.GetBooleanValue(config, ConfigUtil.UseMemoryCacheManager, true);
+                _throwOnDisposed = ConfigUtil.GetBooleanValue(config, ConfigUtil.ThrowOnDisposed, false);
             }
             InitDisposableMembers(config);
         }
@@ -423,6 +425,12 @@ namespace System.Runtime.Caching
                         }
                     }
                 }
+
+                if (_throwOnDisposed)
+                {
+                    throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+                }
+
                 return null;
             }
             MemoryCacheKey cacheKey = new MemoryCacheKey(key);
@@ -518,6 +526,11 @@ namespace System.Runtime.Caching
         {
             if (IsDisposed)
             {
+                if (_throwOnDisposed)
+                {
+                    throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+                }
+
                 return null;
             }
             MemoryCacheKey cacheKey = new MemoryCacheKey(key);
@@ -528,6 +541,12 @@ namespace System.Runtime.Caching
         IEnumerator IEnumerable.GetEnumerator()
         {
             Hashtable h = new Hashtable();
+
+            if (IsDisposed && _throwOnDisposed)
+            {
+                throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+            }
+
             if (!IsDisposed)
             {
                 foreach (var storeRef in _storeRefs)
@@ -541,6 +560,12 @@ namespace System.Runtime.Caching
         protected override IEnumerator<KeyValuePair<string, object>> GetEnumerator()
         {
             Dictionary<string, object> h = new Dictionary<string, object>();
+
+            if (IsDisposed && _throwOnDisposed)
+            {
+                throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+            }
+
             if (!IsDisposed)
             {
                 foreach (var storeRef in _storeRefs)
@@ -560,12 +585,17 @@ namespace System.Runtime.Caching
 
         public long Trim(int percent)
         {
+            if (IsDisposed && _throwOnDisposed)
+            {
+                throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+            }
+
             if (percent > 100)
             {
                 percent = 100;
             }
             long trimmed = 0;
-            if (_disposed == 0)
+            if (!IsDisposed)
             {
                 foreach (var storeRef in _storeRefs)
                 {
@@ -701,6 +731,12 @@ namespace System.Runtime.Caching
                         }
                     }
                 }
+
+                if (_throwOnDisposed)
+                {
+                    throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+                }
+
                 return;
             }
             MemoryCacheKey cacheKey = new MemoryCacheKey(key);
@@ -741,6 +777,12 @@ namespace System.Runtime.Caching
                         }
                     }
                 }
+
+                if (_throwOnDisposed)
+                {
+                    throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+                }
+
                 return;
             }
             // Insert updatable cache entry
@@ -797,6 +839,11 @@ namespace System.Runtime.Caching
             }
             if (IsDisposed)
             {
+                if (_throwOnDisposed)
+                {
+                    throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+                }
+
                 return null;
             }
             MemoryCacheEntry entry = RemoveEntry(key, null, reason);
@@ -809,6 +856,12 @@ namespace System.Runtime.Caching
             {
                 throw new NotSupportedException(SR.RegionName_not_supported);
             }
+
+            if (IsDisposed && _throwOnDisposed)
+            {
+                throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+            }
+
             long count = 0;
             if (!IsDisposed)
             {
@@ -840,6 +893,11 @@ namespace System.Runtime.Caching
             {
                 throw new ArgumentNullException(nameof(keys));
             }
+            if (IsDisposed && _throwOnDisposed)
+            {
+                throw new ObjectDisposedException(typeof(MemoryCache).FullName);
+            }
+
             Dictionary<string, object> values = null;
             if (!IsDisposed)
             {

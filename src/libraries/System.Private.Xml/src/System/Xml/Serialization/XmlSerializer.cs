@@ -332,7 +332,7 @@ namespace System.Xml.Serialization
         [RequiresUnreferencedCode(TrimSerializationWarning)]
         public void Serialize(Stream stream, object? o, XmlSerializerNamespaces? namespaces)
         {
-            XmlTextWriter xmlWriter = new XmlTextWriter(stream, null);
+            XmlTextWriter xmlWriter = new XmlTextWriterInternal(stream, null);
             xmlWriter.Formatting = Formatting.Indented;
             xmlWriter.Indentation = 2;
             Serialize(xmlWriter, o, namespaces);
@@ -985,6 +985,26 @@ namespace System.Xml.Serialization
                     break;
             }
             return o;
+        }
+
+        private class XmlTextWriterInternal : XmlTextWriter
+        {
+            public XmlTextWriterInternal(Stream w, Encoding? encoding) : base(w, encoding) { }
+
+            // dotnet/runtime #421: The null character - even in encoded form - is technically an
+            // invalid character in XML 1.0 and 1.1. XmlTextWriter will happily encode and write
+            // null characters. But they are correctly rejected by XmlReader. Which causes
+            // round-trip failures. We should throw a similar exception during serialization
+            // if we encounter a null character.
+            public override void WriteString(string? text)
+            {
+                int idx = text?.IndexOf('\0') ?? -1;
+                if (idx >= 0)
+                {
+                    throw new XmlException(SR.Xml_InvalidCharacter, XmlException.BuildCharExceptionArgs(text!, idx));
+                }
+                base.WriteString(text?.Replace("\0", "&#x0;"));
+            }
         }
 
         private sealed class XmlSerializerMappingKey

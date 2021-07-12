@@ -18,7 +18,7 @@ namespace System.Xml.Serialization
     /// </devdoc>
     public class XmlSerializerNamespaces
     {
-        private Dictionary<string, string?>? _namespaces;
+        private Dictionary<string, XmlQualifiedName>? _namespaces;
 
         /// <devdoc>
         ///    <para>[To be supplied.]</para>
@@ -27,14 +27,13 @@ namespace System.Xml.Serialization
         {
         }
 
-
         /// <internalonly/>
         /// <devdoc>
         ///    <para>[To be supplied.]</para>
         /// </devdoc>
         public XmlSerializerNamespaces(XmlSerializerNamespaces namespaces)
         {
-            _namespaces = new Dictionary<string, string?>(namespaces.Namespaces);
+            _namespaces = new Dictionary<string, XmlQualifiedName>(namespaces.NamespacesInternal);
         }
 
         /// <devdoc>
@@ -42,11 +41,10 @@ namespace System.Xml.Serialization
         /// </devdoc>
         public XmlSerializerNamespaces(XmlQualifiedName[] namespaces)
         {
-            for (int i = 0; i < namespaces.Length; i++)
-            {
-                XmlQualifiedName qname = namespaces[i];
-                Add(qname.Name, qname.Namespace);
-            }
+            _namespaces = new Dictionary<string, XmlQualifiedName>(namespaces.Length);
+
+            foreach (var qname in namespaces)
+                _namespaces.Add(qname.Name, qname);
         }
 
         /// <devdoc>
@@ -65,7 +63,7 @@ namespace System.Xml.Serialization
 
         internal void AddInternal(string prefix, string? ns)
         {
-            Namespaces[prefix] = ns;
+            NamespacesInternal[prefix] = new XmlQualifiedName(prefix, ns);
         }
 
         /// <devdoc>
@@ -73,11 +71,11 @@ namespace System.Xml.Serialization
         /// </devdoc>
         public XmlQualifiedName[] ToArray()
         {
-            ArrayList? namespaceList = NamespaceList;
-            if (namespaceList == null)
+            if (_namespaces == null || _namespaces.Count == 0)
                 return Array.Empty<XmlQualifiedName>();
-            var array = new XmlQualifiedName[namespaceList.Count];
-            namespaceList.CopyTo(array);
+
+            XmlQualifiedName[] array = new XmlQualifiedName[_namespaces.Count];
+            _namespaces.Values.CopyTo(array, 0);
             return array;
         }
 
@@ -86,7 +84,19 @@ namespace System.Xml.Serialization
         /// </devdoc>
         public int Count
         {
-            get { return Namespaces.Count; }
+            get { return (_namespaces == null) ? 0 : _namespaces.Count; }
+        }
+
+        internal IEnumerable<XmlQualifiedName> Namespaces => NamespacesInternal.Values;
+
+        private Dictionary<string, XmlQualifiedName> NamespacesInternal
+        {
+            get
+            {
+                if (_namespaces == null)
+                    _namespaces = new Dictionary<string, XmlQualifiedName>();
+                return _namespaces;
+            }
         }
 
         internal ArrayList? NamespaceList
@@ -95,42 +105,43 @@ namespace System.Xml.Serialization
             {
                 if (_namespaces == null || _namespaces.Count == 0)
                     return null;
-                ArrayList namespaceList = new ArrayList();
-                foreach (string key in Namespaces.Keys)
-                {
-                    namespaceList.Add(new XmlQualifiedName(key, (string?)Namespaces[key]));
-                }
-                return namespaceList;
+
+                return new ArrayList(_namespaces.Values);
             }
         }
 
-        [AllowNull]
-        internal Dictionary<string, string?> Namespaces
+        internal bool TryLookupPrefix(string? ns, out string? prefix)
         {
-            get
-            {
-                if (_namespaces == null)
-                    _namespaces = new Dictionary<string, string?>();
-                return _namespaces;
-            }
-            set { _namespaces = value; }
-        }
+            prefix = null;
 
-        internal string? LookupPrefix(string? ns)
-        {
-            if (string.IsNullOrEmpty(ns))
-                return null;
-            if (_namespaces == null || _namespaces.Count == 0)
-                return null;
+            if (string.IsNullOrEmpty(ns) || _namespaces == null || _namespaces.Count == 0)
+                return false;
 
-            foreach (string prefix in _namespaces.Keys)
+            foreach (string pfx in _namespaces.Keys)
             {
-                if (!string.IsNullOrEmpty(prefix) && _namespaces[prefix] == ns)
+                if (!string.IsNullOrEmpty(pfx) && _namespaces[pfx].Namespace == ns)
                 {
-                    return prefix;
+                    prefix = pfx;
+                    return true;
                 }
             }
-            return null;
+            return false;
+        }
+
+        internal bool TryLookupNamespace(string? prefix, out string? ns)
+        {
+            ns = null;
+
+            if (string.IsNullOrEmpty(prefix) || _namespaces == null || _namespaces.Count == 0)
+                return false;
+
+            if (_namespaces.TryGetValue(prefix, out XmlQualifiedName? qName))
+            {
+                ns = qName.Namespace;
+                return true;
+            }
+
+            return false;
         }
     }
 }

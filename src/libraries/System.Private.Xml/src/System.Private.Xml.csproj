@@ -565,6 +565,9 @@
     <Reference Include="System.Runtime.CompilerServices.Unsafe" />
     <Reference Include="System.Runtime.Extensions" />
     <Reference Include="System.Runtime.InteropServices" />
+    <Reference Include="System.Runtime.Loader">
+      <HintPath>..\..\..\..\artifacts\bin\microsoft.netcore.app.ref\ref\net6.0\System.Runtime.Loader.dll</HintPath>
+    </Reference>
     <Reference Include="System.Security.Cryptography.Algorithms" />
     <Reference Include="System.Security.Cryptography.Primitives" />
     <Reference Include="System.Text.Encoding.Extensions" />

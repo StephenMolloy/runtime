@@ -575,6 +575,7 @@ namespace System.Xml.Serialization
                 mapping.TypeDesc = typeDesc;
             }
             CheckContext(typeDesc, context);
+            //smolloy DEBUG DEGUB BUGBUG TODO
             _specials.Add(type, mapping);
             _typeScope.AddTypeMapping(mapping);
             return mapping;

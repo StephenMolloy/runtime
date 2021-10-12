@@ -1397,7 +1397,7 @@ namespace MonoTests.System.Runtime.Caching
                 // add some short duration entries
                 for (int i = 0; i < HEAP_RESIZE_SHORT_ENTRIES; i++)
                 {
-                    var expireAt = DateTimeOffset.Now.AddSeconds(3);
+                    var expireAt = DateTimeOffset.Now.AddSeconds(2);
                     mc.Add("short-" + i, i.ToString(), expireAt);
                 }
 
@@ -1469,7 +1469,7 @@ namespace MonoTests.System.Runtime.Caching
 
                 Assert.Equal(200, mc.GetCount());
 
-                await Task.Delay(2000);
+                await Task.Delay(3000);
 
                 for (int i = 0; i < 100; i++)
                 {

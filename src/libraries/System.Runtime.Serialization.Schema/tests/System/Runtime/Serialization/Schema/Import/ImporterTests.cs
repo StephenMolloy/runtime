@@ -110,22 +110,23 @@ namespace System.Runtime.Serialization.Schema.Tests
         public static IEnumerable<object[]> Import_MemberData()
         {
             int newlineSize = Environment.NewLine.Length;
+            int versionLength = typeof(XsdDataContractImporter).Assembly.GetName().Version.ToString().Length;
 
             // Import(XmlSchemaSet)
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas), 5060 + (168 * newlineSize) }; // 168 lines
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas), 2059 + (56 * newlineSize) }; // 56 lines
-            yield return new object[] { (XsdDataContractImporter imp) => { imp.Options.ImportXmlType = true; imp.Import(SchemaUtils.XmlTypeSchemas); }, 2127 + (58 * newlineSize) }; // 58 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas), 5032 + (4 * versionLength) + (168 * newlineSize) }; // 168 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas), 2045 + (2 * versionLength) + (56 * newlineSize) }; // 56 lines
+            yield return new object[] { (XsdDataContractImporter imp) => { imp.Options.ImportXmlType = true; imp.Import(SchemaUtils.XmlTypeSchemas); }, 2120 + (1 * versionLength) + (58 * newlineSize) }; // 58 lines
 
             // Import(XmlSchemaSet, ICollection<XmlQualifiedName>)
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.AllPositiveSchemas, SchemaUtils.ValidTypeNames), 6770 + (215 * newlineSize) }; // 215 lines
-            yield return new object[] { (XsdDataContractImporter imp) => { imp.Options.ImportXmlType = true; imp.Import(SchemaUtils.XmlTypeSchemas, SchemaUtils.XmlTypeNames); }, 2127 + (58 * newlineSize) }; // 58 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.AllPositiveSchemas, SchemaUtils.ValidTypeNames), 6728 + (6 * versionLength) + (215 * newlineSize) }; // 215 lines
+            yield return new object[] { (XsdDataContractImporter imp) => { imp.Options.ImportXmlType = true; imp.Import(SchemaUtils.XmlTypeSchemas, SchemaUtils.XmlTypeNames); }, 2120 + (1 * versionLength) + (58 * newlineSize) }; // 58 lines
 
             // Import(XmlSchemaSet, XmlQualifiedName)
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[0]), 1515 + (50 * newlineSize) }; // 50 lines
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[1]), 1514 + (50 * newlineSize) }; // 50 lines
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[2]), 2729 + (86 * newlineSize) }; // 86 lines
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas, SchemaUtils.ValidTypeNames[3]), 1260 + (35 * newlineSize) }; // 35 lines
-            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas, SchemaUtils.ValidTypeNames[4]), 1238 + (35 * newlineSize) }; // 35 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[0]), 1508 + (1 * versionLength) + (50 * newlineSize) }; // 50 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[1]), 1507 + (1 * versionLength) + (50 * newlineSize) }; // 50 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.PositiveSchemas, SchemaUtils.ValidTypeNames[2]), 2715 + (2 * versionLength) + (86 * newlineSize) }; // 86 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas, SchemaUtils.ValidTypeNames[3]), 1253 + (1 * versionLength) + (35 * newlineSize) }; // 35 lines
+            yield return new object[] { (XsdDataContractImporter imp) => imp.Import(SchemaUtils.ReferenceSchemas, SchemaUtils.ValidTypeNames[4]), 1231 + (1 * versionLength) + (35 * newlineSize) }; // 35 lines
 
             // Import(XmlSchemaSet, XmlSchemaElement)
             // TODO

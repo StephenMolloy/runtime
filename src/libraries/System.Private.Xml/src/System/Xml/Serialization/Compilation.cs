@@ -48,7 +48,7 @@ namespace System.Xml.Serialization
 
         [RequiresUnreferencedCode("calls GenerateRefEmitAssembly")]
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
-        internal TempAssembly(XmlMapping[] xmlMappings, Type?[] types, string? defaultNamespace, string? location)
+        internal TempAssembly(XmlMapping[] xmlMappings, Type?[] types, string? defaultNamespace, string? location, bool isCaching = true)
         {
             bool containsSoapMapping = false;
             for (int i = 0; i < xmlMappings.Length; i++)
@@ -64,7 +64,7 @@ namespace System.Xml.Serialization
             {
                 try
                 {
-                    _assembly = GenerateRefEmitAssembly(xmlMappings, types);
+                    _assembly = GenerateRefEmitAssembly(xmlMappings, types, runAndCollect: !isCaching);
                 }
                 // Only catch and handle known failures with RefEmit
                 catch (CodeGeneratorConversionException ex)
@@ -435,7 +435,7 @@ namespace System.Xml.Serialization
 
         [RequiresUnreferencedCode("calls GenerateElement")]
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
-        internal static Assembly GenerateRefEmitAssembly(XmlMapping[] xmlMappings, Type?[] types)
+        internal static Assembly GenerateRefEmitAssembly(XmlMapping[] xmlMappings, Type?[] types, bool runAndCollect = false)
         {
             var mainType = (types.Length > 0) ? types[0] : null;
             Assembly? mainAssembly = mainType?.Assembly;
@@ -455,7 +455,7 @@ namespace System.Xml.Serialization
                     VerifyLoadContext(mapping.Accessor.Mapping?.TypeDesc?.Type, mainAssembly);
 
                 string assemblyName = "Microsoft.GeneratedCode";
-                AssemblyBuilder assemblyBuilder = CodeGenerator.CreateAssemblyBuilder(assemblyName);
+                AssemblyBuilder assemblyBuilder = CodeGenerator.CreateAssemblyBuilder(assemblyName, runAndCollect);
                 // Add AssemblyVersion attribute to match parent assembly version
                 if (mainType != null)
                 {

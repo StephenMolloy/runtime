@@ -282,7 +282,7 @@ namespace System.Xml.Serialization
             _mapping = GenerateXmlTypeMapping(type, overrides, extraTypes, root, defaultNamespace);
             if (Mode != SerializationMode.ReflectionOnly)
             {
-                _tempAssembly = GenerateTempAssembly(_mapping, type, defaultNamespace, location);
+                _tempAssembly = GenerateTempAssembly(_mapping, type, defaultNamespace, location, false);
             }
         }
 
@@ -316,7 +316,7 @@ namespace System.Xml.Serialization
 
         [RequiresUnreferencedCode("creates TempAssembly")]
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
-        internal static TempAssembly? GenerateTempAssembly(XmlMapping xmlMapping, Type? type, string? defaultNamespace, string? location)
+        internal static TempAssembly? GenerateTempAssembly(XmlMapping xmlMapping, Type? type, string? defaultNamespace, string? location, bool isCaching = true)
         {
             ArgumentNullException.ThrowIfNull(xmlMapping);
 
@@ -326,7 +326,7 @@ namespace System.Xml.Serialization
                 return null;
             }
 
-            return new TempAssembly(new XmlMapping[] { xmlMapping }, new Type?[] { type }, defaultNamespace, location);
+            return new TempAssembly(new XmlMapping[] { xmlMapping }, new Type?[] { type }, defaultNamespace, location, isCaching);
         }
 
         [RequiresUnreferencedCode(TrimSerializationWarning)]

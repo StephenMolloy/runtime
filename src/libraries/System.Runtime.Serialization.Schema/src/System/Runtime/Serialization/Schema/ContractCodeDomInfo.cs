@@ -44,8 +44,6 @@ namespace System.Runtime.Serialization
 
         internal bool UsesWildcardNamespace { get; set; }
 
-        internal bool? CollectionItemIsNullable { get; set; }
-
         internal HashSet<string> GetMemberNames()
         {
             if (ReferencedTypeExists)

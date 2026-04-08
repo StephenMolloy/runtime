@@ -255,7 +255,6 @@ namespace System.Runtime.Serialization.DataContracts
         public DataContractSet(System.Runtime.Serialization.ISerializationSurrogateProvider? dataContractSurrogate, System.Collections.Generic.IEnumerable<System.Type>? referencedTypes, System.Collections.Generic.IEnumerable<System.Type>? referencedCollectionTypes) { }
         public System.Collections.Generic.Dictionary<System.Xml.XmlQualifiedName, System.Runtime.Serialization.DataContracts.DataContract> Contracts { get { throw null; } }
         public System.Collections.Generic.Dictionary<System.Xml.XmlQualifiedName, System.Runtime.Serialization.DataContracts.DataContract>? KnownTypesForObject { get { throw null; } }
-        public System.Collections.Generic.Dictionary<System.Runtime.Serialization.DataContracts.DataContract, object> ProcessedContracts { get { throw null; } }
         public System.Collections.Hashtable SurrogateData { get { throw null; } }
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute("Data Contract Serialization and Deserialization might require types that cannot be statically analyzed.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute("Data Contract Serialization and Deserialization might require types that cannot be statically analyzed. Make sure all of the required types are preserved.")]

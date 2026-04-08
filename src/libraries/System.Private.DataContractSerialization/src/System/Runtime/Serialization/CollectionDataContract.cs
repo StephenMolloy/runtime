@@ -70,7 +70,7 @@ namespace System.Runtime.Serialization.DataContracts
     internal sealed class CollectionDataContract : DataContract
     {
         internal const string ContractTypeString = nameof(CollectionDataContract);
-        public override string? ContractType => ContractTypeString;
+        public override string? ContractType => (IsItemTypeNullable ? "Nullable" : "") + ContractTypeString;
 
         private XmlDictionaryString _collectionItemName;
 

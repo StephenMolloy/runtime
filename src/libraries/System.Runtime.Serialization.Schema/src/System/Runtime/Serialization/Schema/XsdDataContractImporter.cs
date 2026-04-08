@@ -323,26 +323,13 @@ namespace System.Runtime.Serialization
         {
             itemElement = null;
 
-            foreach (XmlSchema schema in schemas.Schemas())
+            if (schemas.GlobalTypes[typeName] is not XmlSchemaComplexType { Particle: XmlSchemaSequence rootSequence } || rootSequence.Items.Count != 1)
             {
-                string schemaNamespace = schema.TargetNamespace ?? string.Empty;
-                if (!string.Equals(schemaNamespace, typeName.Namespace, StringComparison.Ordinal))
-                    continue;
-
-                foreach (XmlSchemaObject schemaObject in schema.Items)
-                {
-                    if (schemaObject is XmlSchemaType { Name: not null } schemaType &&
-                        schemaType.Name == typeName.Name &&
-                        schemaType is XmlSchemaComplexType { Particle: XmlSchemaSequence rootSequence } &&
-                        rootSequence.Items.Count == 1)
-                    {
-                        itemElement = rootSequence.Items[0] as XmlSchemaElement;
-                        return itemElement is not null;
-                    }
-                }
+                return false;
             }
 
-            return false;
+            itemElement = rootSequence.Items[0] as XmlSchemaElement;
+            return itemElement != null;
         }
 
         [RequiresUnreferencedCode(ImportGlobals.SerializerTrimmerWarning)]

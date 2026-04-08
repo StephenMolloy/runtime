@@ -56,7 +56,7 @@ namespace System.Runtime.Serialization
                 if (!itemContract.IsValueType)
                     return true;
 
-                // GetArrayTypeName()) generates the default DCS stable XML name for a collection of this item contract
+                // GetArrayTypeName() generates the default DCS stable XML name for a collection of this item contract
                 // One of these variants should match for our item type, unless the imported schema is using a non-standard
                 // XML name for the collection item type.
 

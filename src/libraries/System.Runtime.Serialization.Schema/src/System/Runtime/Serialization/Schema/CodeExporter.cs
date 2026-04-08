@@ -33,14 +33,16 @@ namespace System.Runtime.Serialization
         private static readonly object s_surrogateDataKey = typeof(ISerializationSurrogateProvider2);
 
         private readonly DataContractSet _dataContractSet;
+        private readonly Dictionary<DataContract, ContractCodeDomInfo> _contractCodeDomInfos;
         private readonly CodeCompileUnit _codeCompileUnit;
         private readonly ImportOptions? _options;
         private readonly Dictionary<string, string> _namespaces;
         private readonly Dictionary<string, string?> _clrNamespaces;
 
-        internal CodeExporter(DataContractSet dataContractSet, ImportOptions? options, CodeCompileUnit codeCompileUnit)
+        internal CodeExporter(DataContractSet dataContractSet, Dictionary<DataContract, ContractCodeDomInfo> contractCodeDomInfos, ImportOptions? options, CodeCompileUnit codeCompileUnit)
         {
             _dataContractSet = dataContractSet;
+            _contractCodeDomInfos = contractCodeDomInfos;
             _codeCompileUnit = codeCompileUnit;
             AddReferencedAssembly(Assembly.GetExecutingAssembly());
             _options = options;
@@ -393,14 +395,12 @@ namespace System.Runtime.Serialization
 
         private ContractCodeDomInfo GetContractCodeDomInfo(DataContract dataContract)
         {
-            ContractCodeDomInfo? contractCodeDomInfo = null;
-            if (_dataContractSet.ProcessedContracts.TryGetValue(dataContract, out object? info))
-                contractCodeDomInfo = info as ContractCodeDomInfo;
-            if (contractCodeDomInfo == null)
+            if (!_contractCodeDomInfos.TryGetValue(dataContract, out ContractCodeDomInfo? contractCodeDomInfo))
             {
                 contractCodeDomInfo = new ContractCodeDomInfo();
-                _dataContractSet.ProcessedContracts.Add(dataContract, contractCodeDomInfo);
+                _contractCodeDomInfos.Add(dataContract, contractCodeDomInfo);
             }
+
             return contractCodeDomInfo;
         }
 
@@ -1179,13 +1179,10 @@ namespace System.Runtime.Serialization
             // and dictionary is not found in referenced types
             if (keyValueContract != null && _dataContractSet.GetDataContract(keyValueContract.XmlName) == null)
             {
-                ContractCodeDomInfo? contractCodeDomInfo = null;
-                if (_dataContractSet.ProcessedContracts.TryGetValue(keyValueContract, out object? info))
-                    contractCodeDomInfo = info as ContractCodeDomInfo;
-                if (contractCodeDomInfo == null)
+                if (!_contractCodeDomInfos.ContainsKey(keyValueContract))
                 {
-                    contractCodeDomInfo = new ContractCodeDomInfo();
-                    _dataContractSet.ProcessedContracts.Add(keyValueContract, contractCodeDomInfo);
+                    ContractCodeDomInfo contractCodeDomInfo = new ContractCodeDomInfo();
+                    _contractCodeDomInfos.Add(keyValueContract, contractCodeDomInfo);
                     ExportClassDataContract(keyValueContract, contractCodeDomInfo);
                     contractCodeDomInfo.IsProcessed = true;
                 }

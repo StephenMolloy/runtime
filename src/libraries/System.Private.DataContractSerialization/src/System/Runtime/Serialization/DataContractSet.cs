@@ -57,7 +57,7 @@ namespace System.Runtime.Serialization.DataContracts
         public DataContractDictionary Contracts =>
             _contracts ??= new DataContractDictionary();
 
-        public Dictionary<DataContract, object> ProcessedContracts =>
+        internal Dictionary<DataContract, object> ProcessedContracts =>
             _processedContracts ??= new Dictionary<DataContract, object>();
 
         public Hashtable SurrogateData => field ??= new Hashtable();

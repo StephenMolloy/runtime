@@ -31,6 +31,7 @@ namespace System.Runtime.Serialization
     {
         private CodeCompileUnit _codeCompileUnit = null!;   // Not directly referenced. Always lazy initialized by property getter.
         private DataContractSet? _dataContractSet;
+        private Dictionary<DataContract, ContractCodeDomInfo> _contractCodeDomInfos = new Dictionary<DataContract, ContractCodeDomInfo>();
 
         private static readonly XmlQualifiedName[] s_emptyTypeNameArray = Array.Empty<XmlQualifiedName>();
         private XmlQualifiedName[] _singleTypeNameArray = null!;   // Not directly referenced. Always lazy initialized by property getter.
@@ -219,7 +220,7 @@ namespace System.Runtime.Serialization
         public CodeTypeReference GetCodeTypeReference(XmlQualifiedName typeName)
         {
             DataContract dataContract = FindDataContract(typeName);
-            CodeExporter codeExporter = new CodeExporter(DataContractSet, Options, CodeCompileUnit);
+            CodeExporter codeExporter = new CodeExporter(DataContractSet, _contractCodeDomInfos, Options, CodeCompileUnit);
             return codeExporter.GetCodeTypeReference(dataContract);
         }
 
@@ -237,7 +238,7 @@ namespace System.Runtime.Serialization
             if (typeName == null)
                 throw ExceptionUtil.ThrowHelperError(new ArgumentNullException(nameof(typeName)));
             DataContract dataContract = FindDataContract(typeName);
-            CodeExporter codeExporter = new CodeExporter(DataContractSet, Options, CodeCompileUnit);
+            CodeExporter codeExporter = new CodeExporter(DataContractSet, _contractCodeDomInfos, Options, CodeCompileUnit);
             return codeExporter.GetElementTypeReference(dataContract, element.IsNillable);
         }
 
@@ -276,7 +277,7 @@ namespace System.Runtime.Serialization
                     throw ExceptionUtil.ThrowHelperError(new InvalidOperationException(SR.Format(SR.TypeHasNotBeenImported, typeName.Name, typeName.Namespace)));
             }
 
-            CodeExporter codeExporter = new CodeExporter(DataContractSet, Options, CodeCompileUnit);
+            CodeExporter codeExporter = new CodeExporter(DataContractSet, _contractCodeDomInfos, Options, CodeCompileUnit);
             return codeExporter.GetKnownTypeReferences(dataContract);
         }
 
@@ -296,6 +297,17 @@ namespace System.Runtime.Serialization
             }
         }
 
+        private ContractCodeDomInfo GetContractCodeDomInfo(DataContract dataContract)
+        {
+            if (!_contractCodeDomInfos.TryGetValue(dataContract, out ContractCodeDomInfo? contractCodeDomInfo))
+            {
+                contractCodeDomInfo = new ContractCodeDomInfo();
+                _contractCodeDomInfos.Add(dataContract, contractCodeDomInfo);
+            }
+
+            return contractCodeDomInfo;
+        }
+
         [RequiresUnreferencedCode(ImportGlobals.SerializerTrimmerWarning)]
         private void CacheCollectionItemNullability(XmlSchemaSet schemas)
         {
@@ -308,13 +320,7 @@ namespace System.Runtime.Serialization
                     continue;
                 }
 
-                if (!DataContractSet.ProcessedContracts.TryGetValue(dataContract, out object? info) ||
-                    info is not ContractCodeDomInfo contractCodeDomInfo)
-                {
-                    contractCodeDomInfo = new ContractCodeDomInfo();
-                    DataContractSet.ProcessedContracts[dataContract] = contractCodeDomInfo;
-                }
-
+                ContractCodeDomInfo contractCodeDomInfo = GetContractCodeDomInfo(dataContract);
                 contractCodeDomInfo.CollectionItemIsNullable = itemElement.IsNillable;
             }
         }
@@ -349,6 +355,7 @@ namespace System.Runtime.Serialization
         private IList<XmlQualifiedName>? InternalImport(XmlSchemaSet schemas, ICollection<XmlQualifiedName>? typeNames, ICollection<XmlSchemaElement>? elements)
         {
             DataContractSet? oldValue = (_dataContractSet == null) ? null : new DataContractSet(_dataContractSet);
+            Dictionary<DataContract, ContractCodeDomInfo> oldCodeDomInfos = new Dictionary<DataContract, ContractCodeDomInfo>(_contractCodeDomInfos);
             IList<XmlQualifiedName>? elementTypeNames = null;
             try
             {
@@ -359,7 +366,7 @@ namespace System.Runtime.Serialization
 
                 CacheCollectionItemNullability(schemas);
 
-                CodeExporter codeExporter = new CodeExporter(DataContractSet, Options, CodeCompileUnit);
+                CodeExporter codeExporter = new CodeExporter(DataContractSet, _contractCodeDomInfos, Options, CodeCompileUnit);
                 codeExporter.Export();
 
                 return elementTypeNames;
@@ -370,6 +377,7 @@ namespace System.Runtime.Serialization
                     throw;
 
                 _dataContractSet = oldValue;
+                _contractCodeDomInfos = oldCodeDomInfos;
                 throw;
             }
         }

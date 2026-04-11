@@ -141,7 +141,7 @@ namespace System.Xml.Serialization
             contract = null;
             string? serializerName;
 
-            using (AssemblyLoadContext.EnterContextualReflection(type.Assembly))
+            using (AssemblyLoadContext.EnterContextualReflection(LoadContextAwareTypeResolver.GetLoadContextAssembly(type)))
             {
                 // check to see if we loading explicit pre-generated assembly
                 object[] attrs = type.GetCustomAttributes(typeof(System.Xml.Serialization.XmlSerializerAssemblyAttribute), false);
@@ -437,8 +437,8 @@ namespace System.Xml.Serialization
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
         internal static Assembly GenerateRefEmitAssembly(XmlMapping[] xmlMappings, Type?[] types)
         {
-            var mainType = (types.Length > 0) ? types[0] : null;
-            Assembly? mainAssembly = mainType?.Assembly;
+            Type? mainType = LoadContextAwareTypeResolver.GetRepresentativeType(types);
+            Assembly? mainAssembly = LoadContextAwareTypeResolver.GetLoadContextAssembly(types) ?? mainType?.Assembly;
             var scopeTable = new Dictionary<TypeScope, XmlMapping>();
             foreach (XmlMapping mapping in xmlMappings)
                 scopeTable[mapping.Scope!] = mapping;
@@ -451,8 +451,13 @@ namespace System.Xml.Serialization
                 // they are compatible with the current ALC
                 for (int i = 0; i < types.Length; i++)
                     VerifyLoadContext(types[i], mainAssembly);
-                foreach (var mapping in xmlMappings)
-                    VerifyLoadContext(mapping.Accessor.Mapping?.TypeDesc?.Type, mainAssembly);
+                foreach (TypeScope scope in scopes)
+                {
+                    foreach (Type scopeType in scope.Types)
+                    {
+                        VerifyLoadContext(scopeType, mainAssembly);
+                    }
+                }
 
                 string assemblyName = "Microsoft.GeneratedCode";
                 AssemblyBuilder assemblyBuilder = CodeGenerator.CreateAssemblyBuilder(assemblyName);
@@ -593,7 +598,7 @@ namespace System.Xml.Serialization
                 return;
 
             // No worries if the type is not collectible
-            var typeALC = AssemblyLoadContext.GetLoadContext(t.Assembly);
+            var typeALC = LoadContextAwareTypeResolver.GetLoadContext(t);
             if (typeALC == null || !typeALC.IsCollectible)
                 return;
 
@@ -702,7 +707,8 @@ namespace System.Xml.Serialization
                 if (_fastCache.TryGetValue(key, out tempAssembly))
                     return tempAssembly;
 
-                if (_collectibleCaches.TryGetValue(t.Assembly, out var cCache))
+                Assembly contextAssembly = LoadContextAwareTypeResolver.GetLoadContextAssembly(t)!;
+                if (_collectibleCaches.TryGetValue(contextAssembly, out var cCache))
                     cCache.TryGetValue(key, out tempAssembly);
 
                 return tempAssembly;
@@ -717,17 +723,18 @@ namespace System.Xml.Serialization
                 if (tempAssembly == assembly)
                     return;
 
-                AssemblyLoadContext? alc = AssemblyLoadContext.GetLoadContext(t.Assembly);
+                AssemblyLoadContext? alc = LoadContextAwareTypeResolver.GetLoadContext(t);
+                Assembly contextAssembly = LoadContextAwareTypeResolver.GetLoadContextAssembly(t)!;
                 TempAssemblyCacheKey key = new TempAssemblyCacheKey(ns, t);
                 Dictionary<TempAssemblyCacheKey, TempAssembly>? cache;
 
                 if (alc != null && alc.IsCollectible)
                 {
-                    cache = _collectibleCaches.TryGetValue(t.Assembly, out var c)   // Clone or create
+                    cache = _collectibleCaches.TryGetValue(contextAssembly, out var c)   // Clone or create
                         ? new Dictionary<TempAssemblyCacheKey, TempAssembly>(c)
                         : new Dictionary<TempAssemblyCacheKey, TempAssembly>();
                     cache[key] = assembly;
-                    _collectibleCaches.AddOrUpdate(t.Assembly, cache);
+                    _collectibleCaches.AddOrUpdate(contextAssembly, cache);
                 }
                 else
                 {

@@ -612,7 +612,7 @@ namespace System.Xml.Serialization
                 {
                     if (type == null)
                     {
-                        tempAssembly = new TempAssembly(mappings, new Type?[] { type }, null, null);
+                        tempAssembly = new TempAssembly(mappings, GetTypesFromMappings(mappings, type), null, null);
                         XmlSerializer[] serializers = new XmlSerializer[mappings.Length];
 
                         contract = tempAssembly.Contract;
@@ -705,10 +705,8 @@ namespace System.Xml.Serialization
         private static XmlSerializer[] GetSerializersFromCache(XmlMapping[] mappings, Type type)
         {
             XmlSerializer?[] serializers = new XmlSerializer?[mappings.Length];
-            Dictionary<XmlSerializerMappingKey, XmlSerializer>? typedMappingTable = null;
-            AssemblyLoadContext? alc = AssemblyLoadContext.GetLoadContext(type.Assembly);
-
-            typedMappingTable = s_xmlSerializerTable.GetOrCreateValue(type, _ => new Dictionary<XmlSerializerMappingKey, XmlSerializer>());
+            Dictionary<XmlSerializerMappingKey, XmlSerializer> typedMappingTable =
+                s_xmlSerializerTable.GetOrCreateValue(type, _ => new Dictionary<XmlSerializerMappingKey, XmlSerializer>());
 
             lock (typedMappingTable)
             {
@@ -731,7 +729,7 @@ namespace System.Xml.Serialization
                         pendingMappings[index++] = mappingKey.Mapping;
                     }
 
-                    TempAssembly tempAssembly = new TempAssembly(pendingMappings, new Type[] { type }, null, null);
+                    TempAssembly tempAssembly = new TempAssembly(pendingMappings, GetTypesFromMappings(pendingMappings, type), null, null);
                     XmlSerializerImplementation contract = tempAssembly.Contract;
 
                     foreach (XmlSerializerMappingKey mappingKey in pendingKeys.Keys)
@@ -748,6 +746,41 @@ namespace System.Xml.Serialization
             return serializers!;
         }
 
+        private static Type?[] GetTypesFromMappings(XmlMapping[] mappings, Type? type)
+        {
+            var types = new List<Type?>(mappings.Length + (type is null ? 0 : 1));
+            var uniqueTypes = new HashSet<Type>();
+
+            if (type is not null)
+            {
+                types.Add(type);
+                uniqueTypes.Add(type);
+            }
+
+            foreach (XmlMapping mapping in mappings)
+            {
+                if (mapping.Scope is null)
+                {
+                    Type? mappingType = mapping.Accessor.Mapping?.TypeDesc?.Type;
+                    if (mappingType is not null && uniqueTypes.Add(mappingType))
+                    {
+                        types.Add(mappingType);
+                    }
+                    continue;
+                }
+
+                foreach (Type scopeType in mapping.Scope.Types)
+                {
+                    if (uniqueTypes.Add(scopeType))
+                    {
+                        types.Add(scopeType);
+                    }
+                }
+            }
+
+            return types.ToArray();
+        }
+
         [RequiresUnreferencedCode(TrimSerializationWarning)]
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
         public static XmlSerializer?[] FromTypes(Type[]? types)
@@ -761,7 +794,7 @@ namespace System.Xml.Serialization
             {
                 mappings[i] = importer.ImportTypeMapping(types[i]);
             }
-            return FromMappings(mappings);
+            return FromMappings(mappings, types.Length == 1 ? types[0] : null);
         }
 
         public static string GetXmlSerializerAssemblyName(Type type)

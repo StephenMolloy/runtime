@@ -2561,7 +2561,7 @@ WithXmlHeader(@"<SimpleType xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instanc
         Assert.Equal(x.Name, y.Name);
     }
 
-    [ConditionalFact(typeof(PlatformDetection), nameof(PlatformDetection.HasAssemblyFiles))]
+    [ConditionalTheory(typeof(PlatformDetection), nameof(PlatformDetection.HasAssemblyFiles))]
 #if XMLSERIALIZERGENERATORTESTS
     // Lack of AssemblyDependencyResolver results in assemblies that are not loaded by path to get
     // loaded in the default ALC, which causes problems for this test.
@@ -2570,9 +2570,11 @@ WithXmlHeader(@"<SimpleType xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instanc
     [ActiveIssue("https://github.com/dotnet/runtime/issues/34072", TestRuntimes.Mono)]
     [ActiveIssue("https://github.com/dotnet/runtime/issues/95928", typeof(PlatformDetection), nameof(PlatformDetection.IsReadyToRunCompiled))]
     [ActiveIssue("https://github.com/dotnet/runtime/issues/124344", typeof(PlatformDetection), nameof(PlatformDetection.IsAppleMobile), nameof(PlatformDetection.IsCoreCLR))]
-    public static void Xml_TypeInCollectibleALC()
+    [InlineData(false)]
+    [InlineData(true)]
+    public static void Xml_TypeInCollectibleALC(bool useCollectionRoot)
     {
-        ExecuteAndUnload("SerializableAssembly.dll", "SerializationTypes.SimpleType", out var weakRef);
+        ExecuteAndUnload("SerializableAssembly.dll", "SerializationTypes.SimpleType", useCollectionRoot, out var weakRef);
 
         for (int i = 0; weakRef.IsAlive && i < 10; i++)
         {
@@ -2734,7 +2736,7 @@ WithXmlHeader(@"<SimpleType xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instanc
 #endif
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ExecuteAndUnload(string assemblyfile, string typename, out WeakReference wref)
+    private static void ExecuteAndUnload(string assemblyfile, string typename, bool useCollectionRoot, out WeakReference wref)
     {
         var fullPath = Path.GetFullPath(assemblyfile);
         var alc = new TestAssemblyLoadContext("XmlSerializerTests", true, fullPath);
@@ -2744,18 +2746,63 @@ WithXmlHeader(@"<SimpleType xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instanc
         var asm = alc.LoadFromAssemblyPath(fullPath);
 
         // Ensure the type loaded in the intended non-Default ALC
-        var type = asm.GetType(typename);
+        Type type = asm.GetType(typename)!;
         Assert.Equal(AssemblyLoadContext.GetLoadContext(type.Assembly), alc);
         Assert.NotEqual(alc, AssemblyLoadContext.Default);
 
+        object obj;
+        Type rootType = type;
+
+        if (useCollectionRoot)
+        {
+            rootType = typeof(List<>).MakeGenericType(type);
+            Assert.True(rootType.IsCollectible);
+            Assert.Equal(AssemblyLoadContext.Default, AssemblyLoadContext.GetLoadContext(rootType.Assembly));
+
+            IList list = Assert.IsAssignableFrom<IList>(Activator.CreateInstance(rootType));
+            list.Add(Activator.CreateInstance(type));
+            obj = list;
+        }
+        else
+        {
+            obj = Activator.CreateInstance(rootType)!;
+        }
+
         // Round-Trip the instance
-        XmlSerializer serializer = new XmlSerializer(type);
-        var obj = Activator.CreateInstance(type);
+        XmlSerializer serializer = new XmlSerializer(rootType);
         var rtobj = SerializeAndDeserialize(obj, null, () => serializer, true);
         Assert.NotNull(rtobj);
-        Assert.True(rtobj.Equals(obj));
+        AssertEqual(obj, rtobj, useCollectionRoot);
+
+        XmlSerializer cachedSerializer = Assert.Single(XmlSerializer.FromTypes(new[] { rootType }))!;
+        var cachedRtobj = SerializeAndDeserialize(obj, null, () => cachedSerializer, true);
+        Assert.NotNull(cachedRtobj);
+        AssertEqual(obj, cachedRtobj, useCollectionRoot);
+
+        var importer = new XmlReflectionImporter();
+        var member = new XmlReflectionMember { MemberName = "Value", MemberType = rootType };
+        XmlMembersMapping membersMapping = importer.ImportMembersMapping("Root", null, new[] { member }, true);
+        XmlSerializer fromMappingsSerializer = Assert.Single(XmlSerializer.FromMappings(new XmlMapping[] { membersMapping }))!;
+        var fromMappingsRtobj = Assert.IsType<object[]>(SerializeAndDeserialize(new object[] { obj }, null, () => fromMappingsSerializer, true));
+        Assert.Single(fromMappingsRtobj);
+        AssertEqual(obj, fromMappingsRtobj[0], useCollectionRoot);
 
         alc.Unload();
+
+        static void AssertEqual(object expected, object actual, bool isCollectionRoot)
+        {
+            if (isCollectionRoot)
+            {
+                IList expectedList = Assert.IsAssignableFrom<IList>(expected);
+                IList actualList = Assert.IsAssignableFrom<IList>(actual);
+                Assert.Equal(expectedList.Count, actualList.Count);
+                Assert.Equal(expectedList[0], actualList[0]);
+            }
+            else
+            {
+                Assert.True(actual.Equals(expected));
+            }
+        }
     }
 
 

@@ -312,7 +312,7 @@ namespace System.Runtime.Serialization
 
             // This is supposed to be set by GenerateType. If it wasn't, there is a problem.
             Debug.Assert(contractCodeDomInfo.TypeReference != null);
-            return contractCodeDomInfo.TypeReference!;
+            return contractCodeDomInfo.TypeReference;
         }
 
         private CodeTypeReference GetCodeTypeReference(Type type)
@@ -611,7 +611,7 @@ namespace System.Runtime.Serialization
                 {
                     // ItemContract - aka BaseContract - is never null for CollectionDataContract
                     Debug.Assert(collectionContract.BaseContract != null, "BaseContract should not be null for CollectionDataContract");
-                    DataContract itemContract = collectionContract.BaseContract!;
+                    DataContract itemContract = collectionContract.BaseContract;
                     if (collectionContract.IsDictionaryLike(out _, out _, out _))
                     {
                         GenerateKeyValueType(itemContract.As(DataContractType.ClassDataContract));
@@ -632,11 +632,11 @@ namespace System.Runtime.Serialization
         [RequiresUnreferencedCode(ImportGlobals.SerializerTrimmerWarning)]
         private static bool HasDefaultCollectionNames(DataContract collectionContract)
         {
+            // ItemContract - aka BaseContract - is never null for CollectionDataContract
             Debug.Assert(collectionContract.Is(DataContractType.CollectionDataContract));
             Debug.Assert(collectionContract.BaseContract != null, "BaseContract should not be null for CollectionDataContract");
 
-            // ItemContract - aka BaseContract - is never null for CollectionDataContract
-            DataContract itemContract = collectionContract.BaseContract!;
+            DataContract itemContract = collectionContract.BaseContract;
             bool isDictionary = collectionContract.IsDictionaryLike(out string? keyName, out string? valueName, out string? itemName);
             if (itemName != itemContract.XmlName.Name)
                 return false;
@@ -661,7 +661,7 @@ namespace System.Runtime.Serialization
                 Type? type = _dataContractSet.GetReferencedType(GenericDictionaryName, GenericDictionaryContract, out DataContract? _, out object[]? _) ?? typeof(Dictionary<,>);
 
                 // ItemContract - aka BaseContract - is never null for CollectionDataContract
-                DataContract? itemContract = collectionContract.BaseContract!.As(DataContractType.ClassDataContract);
+                DataContract? itemContract = collectionContract.BaseContract.As(DataContractType.ClassDataContract);
 
                 // A dictionary should have a Key/Value item contract that has at least two members: key and value.
                 Debug.Assert(itemContract != null);
@@ -692,7 +692,7 @@ namespace System.Runtime.Serialization
                 if (type != null)
                 {
                     typeReference = GetCodeTypeReference(type);
-                    typeReference.TypeArguments.Add(GetElementTypeReference(itemContract, isItemTypeNullable)!);    // Lists have an item type
+                    typeReference.TypeArguments.Add(GetElementTypeReference(itemContract, isItemTypeNullable));    // Lists have an item type
                     return true;
                 }
             }
@@ -1076,7 +1076,7 @@ namespace System.Runtime.Serialization
             CodeTypeDeclaration type = contractCodeDomInfo.TypeDeclaration;
             // BaseContract is never null for EnumDataContract
             Debug.Assert(enumDataContract.BaseContract != null, "BaseContract should not be null for EnumDataContract");
-            Type baseType = enumDataContract.BaseContract!.UnderlyingType;
+            Type baseType = enumDataContract.BaseContract.UnderlyingType;
             type.IsEnum = true;
             type.BaseTypes.Add(baseType);
             if (baseType.IsDefined(typeof(FlagsAttribute), false))
@@ -1445,6 +1445,7 @@ namespace System.Runtime.Serialization
 
         internal static string GetClrTypeFullName(Type type)
         {
+            // Type.FullName returns null for generic type definitions or types with unassigned generic parameters, so we construct the full name manually in those cases.
             return !type.IsGenericTypeDefinition && type.ContainsGenericParameters ? type.Namespace + "." + type.Name : type.FullName!;
         }
 

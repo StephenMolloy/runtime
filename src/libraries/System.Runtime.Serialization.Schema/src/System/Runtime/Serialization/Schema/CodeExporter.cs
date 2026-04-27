@@ -1445,8 +1445,9 @@ namespace System.Runtime.Serialization
 
         internal static string GetClrTypeFullName(Type type)
         {
-            // Type.FullName returns null for generic type definitions or types with unassigned generic parameters, so we construct the full name manually in those cases.
-            return !type.IsGenericTypeDefinition && type.ContainsGenericParameters ? type.Namespace + "." + type.Name : type.FullName!;
+            // Type.FullName can be null for types that contain unassigned generic parameters and for generic type parameters,
+            // so construct a fallback name only when FullName is unavailable.
+            return type.FullName ?? (type.Namespace == null ? type.Name : type.Namespace + "." + type.Name);
         }
 
         private static string AppendToValidClrIdentifier(string identifier, string appendString)

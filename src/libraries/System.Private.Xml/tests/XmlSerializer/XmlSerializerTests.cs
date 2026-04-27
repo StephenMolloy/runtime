@@ -919,9 +919,7 @@ public static partial class XmlSerializerTests
         XmlSerializer serializer = new XmlSerializer(typeof(SimpleType));
         byte[] data = Encoding.UTF8.GetBytes(payload);
 
-        // Default should be true
-        //const string switchName = "Switch.System.Xml.UseXmlSerializerReadEndElementWorkaround";
-        //using var switchScope = new XmlSerializerAppContextSwitchScope(switchName, true);
+        // "Switch.System.Xml.UseXmlSerializerReadEndElementWorkaround" default should be true
         using var stream = new BlockingAfterBufferStream(data);
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { ConformanceLevel = ConformanceLevel.Fragment });
 

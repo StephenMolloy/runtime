@@ -3,6 +3,7 @@
 
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -433,6 +434,28 @@ namespace System.Xml.Serialization
             return true;
         }
 
+        private static Assembly? FindCollectibleAssembly(Type t)
+        {
+            if (AssemblyLoadContext.GetLoadContext(t.Assembly)?.IsCollectible == true)
+                return t.Assembly;
+
+            if (t.IsGenericType && !t.IsGenericTypeDefinition)
+            {
+                foreach (Type arg in t.GenericTypeArguments)
+                {
+                    Assembly? found = FindCollectibleAssembly(arg);
+                    if (found is not null)
+                        return found;
+                }
+            }
+            else if (t.HasElementType)
+            {
+                return FindCollectibleAssembly(t.GetElementType()!);
+            }
+
+            return null;
+        }
+
         [RequiresUnreferencedCode("calls GenerateElement")]
         [RequiresDynamicCode(XmlSerializer.AotSerializationWarning)]
         internal static Assembly GenerateRefEmitAssembly(XmlMapping[] xmlMappings, Type?[] types)
@@ -445,7 +468,20 @@ namespace System.Xml.Serialization
             TypeScope[] scopes = new TypeScope[scopeTable.Keys.Count];
             scopeTable.Keys.CopyTo(scopes, 0);
 
-            using (AssemblyLoadContext.EnterContextualReflection(mainAssembly))
+            // Make sure we enter the correct ALC. If we have any collectible types, we should enter
+            // the ALC of those types. The mainType's assembly might not satisfy that requirement.
+            Assembly? collectibleAssembly = null;
+            foreach (var t in types)
+            {
+                if (t?.IsCollectible == true)
+                {
+                    collectibleAssembly = FindCollectibleAssembly(t);
+                    Debug.Assert(collectibleAssembly != null);
+                    break;
+                }
+            }
+
+            using (AssemblyLoadContext.EnterContextualReflection(collectibleAssembly ?? mainAssembly))
             {
                 // Before generating any IL, check each mapping and supported type to make sure
                 // they are compatible with the current ALC

@@ -434,8 +434,12 @@ namespace System.Xml.Serialization
             return true;
         }
 
-        private static Assembly? FindCollectibleAssembly(Type t)
+        internal static Assembly? FindCollectibleAssembly(Type t)
         {
+            // Shortcut the common case
+            if (!t.IsCollectible)
+                return null;
+
             if (AssemblyLoadContext.GetLoadContext(t.Assembly)?.IsCollectible == true)
                 return t.Assembly;
 
@@ -738,7 +742,8 @@ namespace System.Xml.Serialization
                 if (_fastCache.TryGetValue(key, out tempAssembly))
                     return tempAssembly;
 
-                if (_collectibleCaches.TryGetValue(t.Assembly, out var cCache))
+                Assembly lookupAssembly = TempAssembly.FindCollectibleAssembly(t) ?? t.Assembly;
+                if (_collectibleCaches.TryGetValue(lookupAssembly, out var cCache))
                     cCache.TryGetValue(key, out tempAssembly);
 
                 return tempAssembly;
@@ -753,17 +758,22 @@ namespace System.Xml.Serialization
                 if (tempAssembly == assembly)
                     return;
 
-                AssemblyLoadContext? alc = AssemblyLoadContext.GetLoadContext(t.Assembly);
                 TempAssemblyCacheKey key = new TempAssemblyCacheKey(ns, t);
                 Dictionary<TempAssemblyCacheKey, TempAssembly>? cache;
 
-                if (alc != null && alc.IsCollectible)
+                // Use the collectible cache for any collectible type so that the cache entry
+                // can be released when the collectible ALC is unloaded. For generic types like
+                // List<Bar> where Bar is collectible, t.Assembly is the default ALC assembly
+                // (System.Collections), so we need to find the actual collectible assembly from
+                // the type's generic arguments or element type.
+                Assembly? collectibleAssembly = TempAssembly.FindCollectibleAssembly(t);
+                if (collectibleAssembly != null)
                 {
-                    cache = _collectibleCaches.TryGetValue(t.Assembly, out var c)   // Clone or create
+                    cache = _collectibleCaches.TryGetValue(collectibleAssembly, out var c)
                         ? new Dictionary<TempAssemblyCacheKey, TempAssembly>(c)
                         : new Dictionary<TempAssemblyCacheKey, TempAssembly>();
                     cache[key] = assembly;
-                    _collectibleCaches.AddOrUpdate(t.Assembly, cache);
+                    _collectibleCaches.AddOrUpdate(collectibleAssembly, cache);
                 }
                 else
                 {

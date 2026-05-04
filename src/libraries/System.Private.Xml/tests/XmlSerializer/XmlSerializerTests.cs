@@ -2877,6 +2877,8 @@ WithXmlHeader(@"<SimpleType xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instanc
             Assert.Equal(1, rtArray.Length);
         else if (rtobj is ICollection rtCollection)
             Assert.Equal(1, rtCollection.Count);
+        else
+            Assert.True(false, $"Expected deserialized object to be an Array or ICollection, but got {rtobj.GetType()}.");
 
         alc.Unload();
     }

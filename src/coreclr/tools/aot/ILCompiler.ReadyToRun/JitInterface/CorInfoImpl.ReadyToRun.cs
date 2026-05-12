@@ -2025,19 +2025,31 @@ namespace Internal.JitInterface
                     originalMethod = methodOnUnderlyingType;
                 }
 
-                MethodDesc directMethod;
-                if (isStaticVirtual)
+                var dimResolution = DefaultInterfaceMethodResolution.None;
+                MethodDesc directMethod = constrainedType.TryResolveConstraintMethodApprox(exactType, originalMethod, out forceUseRuntimeLookup, ref dimResolution);
+                if (isStaticVirtual && directMethod != null)
                 {
-                    directMethod = constrainedType.ResolveVariantInterfaceMethodToStaticVirtualMethodOnType(originalMethod);
-                    if (directMethod != null && !_compilation.NodeFactory.CompilationModuleGroup.VersionsWithMethodBody(directMethod))
+                    if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithMethodBody(directMethod))
                     {
                         directMethod = null;
                     }
+                    else if (dimResolution == DefaultInterfaceMethodResolution.DefaultImplementation)
+                    {
+                        // For static virtual calls resolved through a default interface method,
+                        // emit a Check_VirtualFunctionOverride fixup so that the R2R code is
+                        // rejected at runtime if the resolution changes (e.g. a DIM override
+                        // is added in an assembly outside the version bubble).
+                        MethodWithToken declMethodWithToken = new MethodWithToken(originalMethod, HandleToModuleToken(ref pResolvedToken), null, false, null);
+
+                        ModuleToken moduleToken = _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(directMethod, false, false);
+                        Debug.Assert(!moduleToken.IsNull);
+                        MethodWithToken implMethodWithToken = new MethodWithToken(directMethod, moduleToken, null, false, null);
+
+                        AddPrecodeFixup(_compilation.SymbolNodeFactory.CheckVirtualFunctionOverride(
+                            declMethodWithToken, constrainedType, implMethodWithToken, true));
+                    }
                 }
-                else
-                {
-                    directMethod = constrainedType.TryResolveConstraintMethodApprox(exactType, originalMethod, out forceUseRuntimeLookup);
-                }
+
                 if (directMethod != null)
                 {
                     // Either
@@ -2054,11 +2066,14 @@ namespace Internal.JitInterface
                     useInstantiatingStub = directMethod.OwningType.IsValueType;
 
                     methodAfterConstraintResolution = directMethod;
-                    Debug.Assert(!methodAfterConstraintResolution.OwningType.IsInterface);
+                    // When resolved to a default interface method, the owning type is the interface
+                    Debug.Assert(!methodAfterConstraintResolution.OwningType.IsInterface || (isStaticVirtual && methodAfterConstraintResolution.Signature.IsStatic));
                     resolvedConstraint = true;
                     pResult->thisTransform = CORINFO_THIS_TRANSFORM.CORINFO_NO_THIS_TRANSFORM;
 
-                    exactType = constrainedType;
+                    exactType = (isStaticVirtual && dimResolution == DefaultInterfaceMethodResolution.DefaultImplementation)
+                        ? directMethod.OwningType
+                        : constrainedType;
                     if (isStaticVirtual)
                     {
                         pResolvedToken.tokenType = CorInfoTokenKind.CORINFO_TOKENKIND_ResolvedStaticVirtualMethod;

@@ -1796,3 +1796,18 @@ public class DateTimeOffsetIXmlSerializableContainer : IXmlSerializable
         reader.ReadEndElement();
     }
 }
+
+// Container whose ReadXml reads its element content with ReadElementContentAsString.
+// Used to validate that content-read APIs stay in sync when the DataContractSerializer
+// stream reader splits a single text value into many character-data nodes (regression
+// coverage for content containing carriage returns).
+public class ContentReadingIXmlSerializableContainer : IXmlSerializable
+{
+    public string Content { get; set; }
+
+    public XmlSchema GetSchema() => null;
+
+    public void WriteXml(XmlWriter writer) => writer.WriteString(Content ?? string.Empty);
+
+    public void ReadXml(XmlReader reader) => Content = reader.ReadElementContentAsString();
+}

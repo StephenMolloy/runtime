@@ -885,7 +885,6 @@ namespace System.Xml.Linq
             private readonly IXmlLineInfo? _lineInfo;
             private XContainer _currentContainer;
             private string? _baseUri;
-            private StringBuilder? _textBuffer;
 
             public ContentReader(XContainer rootContainer)
             {
@@ -899,26 +898,11 @@ namespace System.Xml.Linq
                 _lineInfo = (o & LoadOptions.SetLineInfo) != 0 ? r as IXmlLineInfo : null;
             }
 
-            // Consecutive text nodes are buffered and materialized as a single string in one
-            // pass rather than being concatenated one chunk at a time. Some readers (notably the
-            // one used by DataContractSerializer over a stream) deliver a single logical text
-            // value as many small text nodes; appending each of them individually via
-            // AddStringSkipNotify degrades to O(n^2). Buffering keeps loading linear.
-            private void FlushBufferedText()
-            {
-                if (_textBuffer is StringBuilder sb && sb.Length > 0)
-                {
-                    _currentContainer.AddStringSkipNotify(sb.ToString());
-                    sb.Clear();
-                }
-            }
-
             public bool ReadContentFrom(XContainer rootContainer, XmlReader r)
             {
                 switch (r.NodeType)
                 {
                     case XmlNodeType.Element:
-                        FlushBufferedText();
                         XElement e = new XElement(_eCache.Get(r.NamespaceURI).GetName(r.LocalName));
                         if (r.MoveToFirstAttribute())
                         {
@@ -935,7 +919,6 @@ namespace System.Xml.Linq
                         }
                         break;
                     case XmlNodeType.EndElement:
-                        FlushBufferedText();
                         _currentContainer.content ??= string.Empty;
                         if (_currentContainer == rootContainer) return false;
                         _currentContainer = _currentContainer.parent!;
@@ -943,22 +926,18 @@ namespace System.Xml.Linq
                     case XmlNodeType.Text:
                     case XmlNodeType.SignificantWhitespace:
                     case XmlNodeType.Whitespace:
-                        (_textBuffer ??= new StringBuilder()).Append(r.Value);
+                        _currentContainer.AddStringSkipNotify(r.Value);
                         break;
                     case XmlNodeType.CDATA:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XCData(r.Value));
                         break;
                     case XmlNodeType.Comment:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XComment(r.Value));
                         break;
                     case XmlNodeType.ProcessingInstruction:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XProcessingInstruction(r.Name, r.Value));
                         break;
                     case XmlNodeType.DocumentType:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XDocumentType(r.LocalName, r.GetAttribute("PUBLIC"), r.GetAttribute("SYSTEM"), r.Value));
                         break;
                     case XmlNodeType.EntityReference:
@@ -978,7 +957,6 @@ namespace System.Xml.Linq
                 switch (r.NodeType)
                 {
                     case XmlNodeType.Element:
-                        FlushBufferedText();
                         XElement e = new XElement(_eCache.Get(r.NamespaceURI).GetName(r.LocalName));
                         if (r.MoveToFirstAttribute())
                         {
@@ -997,7 +975,6 @@ namespace System.Xml.Linq
                         }
                         break;
                     case XmlNodeType.EndElement:
-                        FlushBufferedText();
                         _currentContainer.content ??= string.Empty;
                         if (_currentContainer == rootContainer) return false;
                         _currentContainer = _currentContainer.parent!;
@@ -1005,22 +982,18 @@ namespace System.Xml.Linq
                     case XmlNodeType.Text:
                     case XmlNodeType.SignificantWhitespace:
                     case XmlNodeType.Whitespace:
-                        (_textBuffer ??= new StringBuilder()).Append(await r.GetValueAsync().ConfigureAwait(false));
+                        _currentContainer.AddStringSkipNotify(await r.GetValueAsync().ConfigureAwait(false));
                         break;
                     case XmlNodeType.CDATA:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XCData(await r.GetValueAsync().ConfigureAwait(false)));
                         break;
                     case XmlNodeType.Comment:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XComment(await r.GetValueAsync().ConfigureAwait(false)));
                         break;
                     case XmlNodeType.ProcessingInstruction:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XProcessingInstruction(r.Name, await r.GetValueAsync().ConfigureAwait(false)));
                         break;
                     case XmlNodeType.DocumentType:
-                        FlushBufferedText();
                         _currentContainer.AddNodeSkipNotify(new XDocumentType(r.LocalName, r.GetAttribute("PUBLIC"), r.GetAttribute("SYSTEM"), await r.GetValueAsync().ConfigureAwait(false)));
                         break;
                     case XmlNodeType.EntityReference:
@@ -1044,7 +1017,6 @@ namespace System.Xml.Linq
                 {
                     case XmlNodeType.Element:
                     {
-                        FlushBufferedText();
                         XElement e = new XElement(_eCache.Get(r.NamespaceURI).GetName(r.LocalName));
                         if (_baseUri != null && _baseUri != baseUri)
                         {
@@ -1080,7 +1052,6 @@ namespace System.Xml.Linq
                     }
                     case XmlNodeType.EndElement:
                     {
-                        FlushBufferedText();
                         _currentContainer.content ??= string.Empty;
                         // Store the line info of the end element tag.
                         // Note that since we've got EndElement the current container must be an XElement
@@ -1108,7 +1079,7 @@ namespace System.Xml.Linq
                         }
                         else
                         {
-                            (_textBuffer ??= new StringBuilder()).Append(r.Value);
+                            _currentContainer.AddStringSkipNotify(r.Value);
                         }
                         break;
                     case XmlNodeType.CDATA:
@@ -1135,7 +1106,6 @@ namespace System.Xml.Linq
 
                 if (newNode != null)
                 {
-                    FlushBufferedText();
                     if (_baseUri != null && _baseUri != baseUri)
                     {
                         newNode.SetBaseUri(baseUri);
@@ -1161,7 +1131,6 @@ namespace System.Xml.Linq
                 {
                     case XmlNodeType.Element:
                         {
-                            FlushBufferedText();
                             XElement e = new XElement(_eCache.Get(r.NamespaceURI).GetName(r.LocalName));
                             if (_baseUri != null && _baseUri != baseUri)
                             {
@@ -1199,7 +1168,6 @@ namespace System.Xml.Linq
                         }
                     case XmlNodeType.EndElement:
                         {
-                            FlushBufferedText();
                             _currentContainer.content ??= string.Empty;
                             // Store the line info of the end element tag.
                             // Note that since we've got EndElement the current container must be an XElement
@@ -1227,7 +1195,7 @@ namespace System.Xml.Linq
                         }
                         else
                         {
-                            (_textBuffer ??= new StringBuilder()).Append(await r.GetValueAsync().ConfigureAwait(false));
+                            _currentContainer.AddStringSkipNotify(await r.GetValueAsync().ConfigureAwait(false));
                         }
                         break;
                     case XmlNodeType.CDATA:
@@ -1254,7 +1222,6 @@ namespace System.Xml.Linq
 
                 if (newNode != null)
                 {
-                    FlushBufferedText();
                     if (_baseUri != null && _baseUri != baseUri)
                     {
                         newNode.SetBaseUri(baseUri);

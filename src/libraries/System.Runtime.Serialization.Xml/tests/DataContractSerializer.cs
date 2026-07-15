@@ -1124,6 +1124,102 @@ public static partial class DataContractSerializerTests
         VerifyXElementObject(original, actual);
     }
 
+    [Theory]
+    [InlineData("single line of text")]
+    [InlineData("line1\r\nline2\r\nline3\r\n")]
+    [InlineData("   \r\n   ")]
+    [InlineData("\r\n\r\n\r\n")]
+    [InlineData("leading text\r\n")]
+    [InlineData("\r\ntrailing text")]
+    public static void DCS_XElementWithMultilineText_RoundTripsValue(string content)
+    {
+        // The reader DataContractSerializer creates over a stream can surface a single logical
+        // text value as many small character-data nodes (a carriage return is encoded as "&#xD;"
+        // and split into its own whitespace node). The loaded element must still reproduce the
+        // original value exactly and coalesce it into a single text node.
+        var original = new XElement("root", content);
+        var actual = DataContractSerializerHelper.SerializeAndDeserialize<XElement>(original, baseline: null, skipStringCompare: true);
+
+        Assert.Equal(content, actual.Value);
+        Assert.Equal(1, actual.Nodes().Count());
+    }
+
+    [Fact]
+    public static void DCS_XElementWithMixedMultilineContent_RoundTrips()
+    {
+        // Multiline text interleaved with a child element: coalescing text runs must not drop,
+        // reorder, or merge across the child boundary.
+        var original = new XElement("root",
+            "before\r\ntext",
+            new XElement("child", "inner\r\nvalue"),
+            "after\r\ntext");
+
+        var actual = DataContractSerializerHelper.SerializeAndDeserialize<XElement>(original, baseline: null, skipStringCompare: true);
+
+        Assert.Equal(original.ToString(SaveOptions.DisableFormatting), actual.ToString(SaveOptions.DisableFormatting));
+        XElement child = actual.Element("child");
+        Assert.NotNull(child);
+        Assert.Equal("inner\r\nvalue", child.Value);
+    }
+
+    [Fact]
+    public static void DCS_XElementWithLargeTextContent_DeserializesInLinearTime()
+    {
+        // Regression guard: deserializing an XElement whose text spans many newline-separated lines
+        // used to be O(n^2) because each character-data chunk was appended by string concatenation,
+        // taking minutes for this input. Linear deserialization completes in a fraction of a second;
+        // the generous bound keeps the test reliable on loaded machines while still catching an
+        // O(n^2) regression.
+        var sb = new StringBuilder(3_000_000);
+        for (int i = 0; i < 100_000; i++)
+            sb.Append("some text content on a line\r\n");
+        var original = new XElement("root", sb.ToString());
+
+        XElement actual = null;
+        Exception failure = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                actual = DataContractSerializerHelper.SerializeAndDeserialize<XElement>(original, baseline: null, skipStringCompare: true, verifyBinaryRoundTrip: false);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        })
+        {
+            IsBackground = true
+        };
+        worker.Start();
+
+        bool completed = worker.Join(TimeSpan.FromSeconds(30));
+        Assert.True(completed, "XElement deserialization did not complete in time, indicating O(n^2) text accumulation.");
+        Assert.Null(failure);
+        Assert.Equal(original.Value, actual.Value);
+    }
+
+    [Theory]
+    [InlineData("line1\r\nline2\r\nline3\r\n")]
+    [InlineData("no carriage returns here")]
+    [InlineData("trailing cr\r")]
+    public static void DCS_IXmlSerializableReadingContentAsString_RoundTrips(string content)
+    {
+        // A custom IXmlSerializable whose ReadXml reads its element with ReadElementContentAsString.
+        // When DataContractSerializer reads over a stream, a carriage return is encoded as "&#xD;"
+        // and surfaces as a separate character-data node, so the reader must keep the content-read
+        // APIs in sync with its internal look-ahead. Deserializing must reproduce the value exactly.
+        var original = new ContentReadingIXmlSerializableContainer { Content = content };
+        var serializer = new DataContractSerializer(typeof(ContentReadingIXmlSerializableContainer));
+
+        using var ms = new MemoryStream();
+        serializer.WriteObject(ms, original);
+        ms.Position = 0;
+        var actual = (ContentReadingIXmlSerializableContainer)serializer.ReadObject(ms);
+
+        Assert.Equal(content, actual.Content);
+    }
+
     [Fact]
     public static void DCS_WithXElement()
     {
